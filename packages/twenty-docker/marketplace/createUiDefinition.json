@@ -1,0 +1,85 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiDb.json#",
+  "handler": "Microsoft.Compute.MultiDb",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "basics": [
+      {}
+    ],
+    "steps": [
+      {
+        "name": "appSettings",
+        "label": "Application Settings",
+        "subLabel": {
+          "preText": "Configure your Twenty CRM application settings."
+        },
+        "elements": [
+          {
+            "name": "domainName",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Domain Name",
+            "defaultValue": "crm.example.com",
+            "toolTip": "The custom DNS name for your CRM instance.",
+            "constraints": {
+              "required": true,
+              "regex": "^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,4}$",
+              "validationMessage": "Please enter a valid domain name."
+            },
+            "visible": true
+          },
+          {
+            "name": "storageType",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Storage Backend Type",
+            "defaultValue": "local",
+            "toolTip": "Select local (PVC-based) storage or S3 (AWS/MinIO/Azure Blob S3 API) storage.",
+            "constraints": {
+              "allowedValues": [
+                {
+                  "label": "Local PVC storage",
+                  "value": "local"
+                },
+                {
+                  "label": "S3-compatible Object Storage",
+                  "value": "s3"
+                }
+              ]
+            },
+            "visible": true
+          }
+        ]
+      },
+      {
+        "name": "dependencySettings",
+        "label": "Database & Cache Settings",
+        "subLabel": {
+          "preText": "Configure external or bundled databases."
+        },
+        "elements": [
+          {
+            "name": "deployInternalDb",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Deploy internal PostgreSQL",
+            "defaultValue": true,
+            "toolTip": "Deploy PostgreSQL inside your AKS cluster. Set to false if you connect to Azure Database for PostgreSQL.",
+            "visible": true
+          },
+          {
+            "name": "deployInternalRedis",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Deploy internal Redis",
+            "defaultValue": true,
+            "toolTip": "Deploy Redis inside your AKS cluster. Set to false if you connect to Azure Cache for Redis.",
+            "visible": true
+          }
+        ]
+      }
+    ],
+    "outputs": {
+      "domain": "[steps('appSettings').domainName]",
+      "storageType": "[steps('appSettings').storageType]",
+      "internalDb": "[steps('dependencySettings').deployInternalDb]",
+      "internalRedis": "[steps('dependencySettings').deployInternalRedis]"
+    }
+  }
+}

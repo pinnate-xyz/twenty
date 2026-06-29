@@ -1,6 +1,6 @@
 # Twenty CRM - Cloud Marketplace Publication Guide
 
-This folder contains assets and helper configurations to deploy, package, and list Twenty CRM on the **AWS Marketplace** (EKS Container Product) and **Google Cloud Marketplace** (GKE Container/Helm Application).
+This folder contains assets and helper configurations to deploy, package, and list Twenty CRM on the **AWS Marketplace** (EKS Container Product), **Google Cloud Marketplace** (GKE Container/Helm Application), and **Azure Marketplace** (AKS Container Offer).
 
 ---
 
@@ -75,8 +75,34 @@ AWS Marketplace Container products require OCI-compliant Helm charts and contain
 
 ---
 
-## 4. Production Security Scanning (Mandatory)
+## 4. Azure Marketplace AKS Integration
 
-Both AWS and GCP scan all submitted container images and Helm charts for CVEs (vulnerabilities).
+Azure Marketplace Container Offers require a packaged **CNAB (Cloud Native Application Bundle)** bundle uploaded to an **Azure Container Registry (ACR)**.
+
+### Pipeline Steps:
+1. **Create Azure Container Registry (ACR)**:
+   ```bash
+   az acr create --resource-group twenty-rg --name twentyacr --sku Premium
+   ```
+
+2. **Authenticate Local Helm/Docker with ACR**:
+   ```bash
+   az acr login --name twentyacr
+   ```
+
+3. **Push Helm Chart OCI Artifact**:
+   ```bash
+   helm push packages/twenty-docker/marketplace/build/twenty-0.1.0.tgz oci://twentyacr.azurecr.io/twenty-chart
+   ```
+
+4. **Define UI Definition**:
+   Review and use `createUiDefinition.json` to define the Azure Portal installation forms. This customizes variables and maps parameters directly to values inside the deployment bundle.
+
+---
+
+## 5. Production Security Scanning (Mandatory)
+
+All cloud platforms (AWS, GCP, Azure) scan submitted container images and Helm charts for CVEs (vulnerabilities).
 * Ensure you perform container image vulnerability scans (e.g., using `trivy` or `snyk`) on your `twentycrm/twenty` images *prior* to registry uploads.
 * Listings with **Critical** or unmitigated **High** severity CVEs will be automatically blocked by cloud platform reviewers.
+

@@ -151,9 +151,86 @@ AWS does not allow you to reference external public images (like Docker Hub) ins
 
 ---
 
-## Part 3: Mandatory Pre-Publishing Checklist
+## Part 3: Azure Marketplace AKS Integration
 
-Before submitting Twenty to either cloud portal, complete these tasks:
+Azure Marketplace distributes Kubernetes applications as **Azure Container Offers** deployed to Azure Kubernetes Service (AKS). The offer is packaged using the **Cloud Native Application Bundle (CNAB)** format.
+
+### Technical & Administrative Steps
+
+#### Step 3.1: Microsoft Partner Center Registration
+1. Register for a seller account in the [Microsoft Partner Center](https://partner.microsoft.com/).
+2. Complete company validation, financial details, and tax profile.
+3. Ensure you have the **Marketplace Publisher** role assigned to your account.
+
+#### Step 3.2: Configure Azure Container Registry (ACR)
+All images and the deployment bundle must reside in a Premium-tier Azure Container Registry to support marketplace sharing and vulnerability scanning.
+1. Create a Premium ACR:
+   ```bash
+   az acr create --resource-group twenty-rg --name twentyacr --sku Premium
+   ```
+2. Log in to the registry:
+   ```bash
+   az acr login --name twentyacr
+   ```
+3. Tag and push Twenty and support images:
+   ```bash
+   docker tag twentycrm/twenty:latest twentyacr.azurecr.io/twenty-app:latest
+   docker push twentyacr.azurecr.io/twenty-app:latest
+   ```
+
+#### Step 3.3: Structure and Package the CNAB Bundle
+Azure Marketplace uses CNAB to bundle the Helm chart, installation parameters, and UI mappings.
+1. Create a workspace directory for your bundle:
+   ```bash
+   mkdir -p twenty-cnab/chart
+   ```
+2. Copy and unpack your Helm chart into the bundle:
+   ```bash
+   cp -r packages/twenty-docker/helm/twenty/* twenty-cnab/chart/
+   ```
+   *Note: Helm chart archives (`.tgz`) must be unpacked. Microsoft's packager expects raw templates.*
+3. Copy the portal UI definition file:
+   ```bash
+   cp packages/twenty-docker/marketplace/createUiDefinition.json twenty-cnab/
+   ```
+4. Define a standard `manifest.json` describing the application entry point:
+   ```json
+   {
+     "schema": "1.0.0",
+     "name": "twenty-crm-aks",
+     "version": "0.1.0",
+     "helmRepository": {
+       "chartName": "twenty"
+     }
+   }
+   ```
+5. Package and push the CNAB bundle to ACR as an OCI artifact:
+   ```bash
+   # Push OCI artifact
+   helm push packages/twenty-docker/marketplace/build/twenty-0.1.0.tgz oci://twentyacr.azurecr.io/twenty-chart
+   ```
+
+#### Step 3.4: Configure the Partner Center Container Offer
+1. In Microsoft Partner Center, click **Create New Offer** and select **Azure Container**.
+2. Under the **Offer Setup** tab, specify target audience and lead management.
+3. Under **Properties**, set categories (CRM, Developer Tools) and terms of use.
+4. Under **Plans**, create a new plan (e.g. `twenty-free-aks`):
+   * Select pricing: **Free** or **BYOL**.
+   * Link the container images by selecting **Azure Container Registry** and referencing your ACR subscription, repository, and image tags/digests.
+   * Upload the `createUiDefinition.json` file to dictate the checkout parameters.
+
+#### Step 3.5: Certification & Live Deployment
+1. Submit the Container Offer for review.
+2. Microsoft conducts automated vulnerability scans of all images in ACR. If any high/critical security issues are found, the submission will be paused.
+3. Once certified, the plan is placed in the **Staging** phase.
+4. Verify deployment by deploying the container offer onto an active AKS cluster from the preview link.
+5. Click **Go Live** to publish the offer publicly.
+
+---
+
+## Part 4: Mandatory Pre-Publishing Checklist
+
+Before submitting Twenty to any cloud portal, complete these tasks:
 
 ### 1. Security Compliance & Image Scanning
 Cloud marketplaces will automatically reject container images containing critical or unresolved high security vulnerabilities.
@@ -163,10 +240,11 @@ Cloud marketplaces will automatically reject container images containing critica
   ```
 * Resolve all OS package security issues in the Dockerfiles before submission.
 
-### 2. AWS IAM / Kubernetes Least Privilege
+### 2. Cloud IAM / Kubernetes Least Privilege
 * Marketplaces reject pods running with cluster-admin roles. Ensure the Helm chart relies on standard ServiceAccounts with minimized RBAC permissions.
-* AWS Marketplace requires integration with EKS **IAM Roles for Service Accounts (IRSA)** for cloud service access (e.g. S3 uploads) rather than hardcoded credentials.
+* AWS requires integration with EKS **IAM Roles for Service Accounts (IRSA)**, and Azure requires **AKS Workload Identity** for accessing cloud storage/databases without hardcoding secrets.
 
 ### 3. Pricing Model Decision
 * **BYOL (Bring Your Own License) / Free Tier (Recommended)**: The easiest listing format. Bypasses the need for any marketplace billing code integrations.
-* **Metered Billing (Future State)**: Charges users based on active users or database size. Requires integrating the **AWS Marketplace Metering Service API** or the **GCP Service Control API** directly into the Twenty server application code to report usage periodically.
+* **Metered Billing (Future State)**: Charges users based on active users or database size. Requires integrating the **AWS Marketplace Metering Service API**, the **GCP Service Control API**, or the **Azure Marketplace SaaS/Container Billing API** directly into the Twenty server application code to report usage periodically.
+
